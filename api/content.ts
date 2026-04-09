@@ -13,15 +13,12 @@ export const getFeed = async (
     page = 1,
     limit = 10,
 ): Promise<{ data: Post[]; pagination: Pagination }> => {
-    // TODO: (3차) apiClient.get()으로 '/content/list'를 호출하고 res.data를 반환한다
-    // 힌트: page와 limit는 params 옵션으로 전달한다
     const res = await apiClient.get<{ data: Post[]; pagination: Pagination }>(
         '/content/list',
         {
             params: { page, limit },
         },
     );
-    console.log('getFeed response:', res.data); // 디버깅용 로그
     return res.data;
 };
 

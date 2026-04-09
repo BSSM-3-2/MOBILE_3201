@@ -8,21 +8,15 @@ import { ProfileHeader } from '@components/profile/ProfileHeader';
 import { useUserStore } from '@/store/user-store';
 
 export default function ProfileScreen() {
-    const {
-        me,
-        postMap,
-        loading: _loading,
-        fetchMe,
-        fetchUserPosts,
-    } = useUserStore();
+    const { me, postMap, loading, fetchMe, fetchUserPosts } = useUserStore();
 
     useEffect(() => {
         fetchMe();
-    }, [fetchMe]);
+    }, []);
 
     useEffect(() => {
         if (me) fetchUserPosts(me.id);
-    }, [me, fetchUserPosts]);
+    }, [me?.id]);
 
     if (!me) {
         return (

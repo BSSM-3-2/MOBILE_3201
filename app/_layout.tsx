@@ -13,6 +13,7 @@ import 'react-native-reanimated';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from '@components/themed-text';
 import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -37,26 +38,31 @@ export default function RootLayout() {
     if (!loaded) return null;
 
     return (
-        <ThemeProvider
-            value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
-        >
-            <Stack>
-                <Stack.Screen name='(tabs)' options={{ headerShown: false }} />
-                <Stack.Screen
-                    name='profile/[id]'
-                    options={{
-                        headerShown: true,
-                        headerTitle: () => (
-                            <ThemedText style={styles.default}>
-                                사용자 프로필
-                            </ThemedText>
-                        ),
-                        headerBackTitle: '홈으로',
-                    }}
-                />
-            </Stack>
-            <StatusBar style='auto' />
-        </ThemeProvider>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+            <ThemeProvider
+                value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
+            >
+                <Stack>
+                    <Stack.Screen
+                        name='(tabs)'
+                        options={{ headerShown: false }}
+                    />
+                    <Stack.Screen
+                        name='profile/[id]'
+                        options={{
+                            headerShown: true,
+                            headerTitle: () => (
+                                <ThemedText style={styles.default}>
+                                    사용자 프로필
+                                </ThemedText>
+                            ),
+                            headerBackTitle: '홈으로',
+                        }}
+                    />
+                </Stack>
+                <StatusBar style='auto' />
+            </ThemeProvider>
+        </GestureHandlerRootView>
     );
 }
 
