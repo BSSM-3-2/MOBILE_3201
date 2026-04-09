@@ -1,8 +1,6 @@
 import { create } from 'zustand';
 import { Post } from '@type/Post';
-import { getFeed } from '@/api/content';
-// TODO: (5차) toggleLike 구현 시 필요한 함수를 import에 추가한다
-import { likePost, unlikePost } from '@/api/content';
+import { getFeed, likePost, unlikePost } from '@/api/content';
 
 interface FeedState {
     posts: Post[];
@@ -14,6 +12,7 @@ interface FeedState {
     fetchFeed: () => Promise<void>;
     loadMore: () => Promise<void>;
     toggleLike: (postId: string) => Promise<void>;
+    removePost: (postId: string) => void;
 }
 
 export const useFeedStore = create<FeedState>((set, get) => ({
@@ -24,10 +23,8 @@ export const useFeedStore = create<FeedState>((set, get) => ({
     error: null,
 
     fetchFeed: async () => {
-        // TODO: (4차) set()으로 loading을 켜고, getFeed(1)를 호출해 posts/pagination을 저장한다
-        // 힌트: try/catch로 감싸고 실패 시 error 메시지도 저장한다
+        set({ loading: true, error: null });
         try {
-            set({ loading: true });
             const { data, pagination } = await getFeed(1);
             set({
                 posts: data,
@@ -35,8 +32,8 @@ export const useFeedStore = create<FeedState>((set, get) => ({
                 hasNext: pagination.hasNext,
                 loading: false,
             });
-        } catch {
-            set({ error: 'Failed to fetch feed', loading: false });
+        } catch (e) {
+            set({ error: '피드를 불러오지 못했습니다.', loading: false });
         }
     },
 
@@ -54,7 +51,7 @@ export const useFeedStore = create<FeedState>((set, get) => ({
                 hasNext: pagination.hasNext,
                 loading: false,
             });
-        } catch {
+        } catch (e) {
             set({ loading: false });
         }
     },
@@ -65,27 +62,50 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         const target = posts.find(p => p.id === postId);
         if (!target) return;
 
-        // TODO: (5차) 낙관적 업데이트를 구현한다
-        // 순서: ① UI 즉시 반영 → ② API 호출 → ③ 서버 응답으로 동기화 → ④ 실패 시 롤백
-        // 힌트: 롤백할 때 posts 대신 get().posts를 써야 하는 이유를 생각해보자
-        const originalPosts = posts;
+        const wasLiked = target.liked;
+
+        // 1) 즉시 UI 반영
         set({
             posts: posts.map(p =>
-                p.id === postId ? { ...p, liked: !p.liked } : p,
+                p.id === postId
+                    ? {
+                          ...p,
+                          liked: !wasLiked,
+                          likes: wasLiked ? p.likes - 1 : p.likes + 1,
+                      }
+                    : p,
             ),
         });
 
         try {
-            const { likes, liked } = await (target.liked
-                ? unlikePost(postId)
-                : likePost(postId));
+            // 2) API 호출
+            const result = wasLiked
+                ? await unlikePost(postId)
+                : await likePost(postId);
+            // 3) 서버 응답으로 최종 동기화
             set({
                 posts: get().posts.map(p =>
-                    p.id === postId ? { ...p, likes, liked } : p,
+                    p.id === postId
+                        ? { ...p, likes: result.likes, liked: result.liked }
+                        : p,
                 ),
             });
         } catch {
-            set({ posts: originalPosts });
+            // 4) 실패 시 롤백
+            set({
+                posts: get().posts.map(p =>
+                    p.id === postId
+                        ? {
+                              ...p,
+                              liked: wasLiked,
+                              likes: wasLiked ? p.likes + 1 : p.likes - 1,
+                          }
+                        : p,
+                ),
+            });
         }
     },
+
+    // TODO: removePost 구현 (실습 4-5)
+    removePost: (postId: string) => {},
 }));
