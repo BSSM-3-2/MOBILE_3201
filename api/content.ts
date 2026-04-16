@@ -1,5 +1,54 @@
 import apiClient from './client';
 import { Post, Comment, Reply } from '@type/Post';
+import { Platform } from 'react-native';
+
+const BASE_URL = Platform.select({
+    default: 'https://bssm-api.zer0base.me',
+});
+
+export interface CreatePostPayload {
+    caption?: string;
+    images?: { uri: string; name: string; type: string }[];
+}
+
+export const createPost = async (payload: CreatePostPayload): Promise<Post> => {
+    const form = new FormData();
+
+    if (payload.caption) {
+        form.append('caption', payload.caption);
+    }
+
+    payload.images?.forEach(img => {
+        form.append('images', {
+            uri: img.uri,
+            name: img.name,
+            type: img.type,
+        } as unknown as Blob);
+    });
+
+    // axios는 RN에서 FormData 파일 바이너리를 올바르게 전송하지 못하므로 fetch 사용
+    // Content-Type은 설정하지 않아야 fetch가 boundary를 자동으로 붙여줌
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useAuthStore } = require('@/store/auth-store');
+    const token: string | null = useAuthStore.getState().accessToken;
+
+    const res = await fetch(`${BASE_URL}/content`, {
+        method: 'POST',
+        headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: form,
+    });
+
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw Object.assign(new Error(err.message ?? 'createPost failed'), {
+            response: { status: res.status, data: err },
+        });
+    }
+
+    return res.json() as Promise<Post>;
+};
 
 interface Pagination {
     page: number;
