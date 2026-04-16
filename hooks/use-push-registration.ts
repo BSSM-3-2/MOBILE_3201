@@ -1,10 +1,13 @@
 import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import * as Device from 'expo-device';
 import { useAuthStore } from '@/store/auth-store';
 import {
     getPermissionsAsync,
     requestPermissionsAsync,
     getExpoPushTokenAsync,
+    setNotificationChannelAsync,
+    AndroidImportance,
 } from 'expo-notifications';
 import { registerPushDevice } from '@/api/push';
 
@@ -28,6 +31,12 @@ async function registerDevice() {
     // TODO 실습 8-1
     // setNotificationChannelAsync로 Android 알림 채널을 생성하세요
     // name, importance 등을 지정하고, importance 값을 바꿔가며 heads-up 동작을 비교해보세요
+    if (Platform.OS === 'android') {
+        await setNotificationChannelAsync('default', {
+            name: '기본 알림',
+            importance: AndroidImportance.MAX,
+        });
+    }
 
     // TODO 실습 4-1
     // getPermissionsAsync로 현재 권한 상태를 확인하고
