@@ -10,7 +10,14 @@ import {
     ActivityIndicator,
     Alert,
     Platform,
+    Linking,
 } from 'react-native';
+import {
+    getMediaLibraryPermissionsAsync,
+    requestMediaLibraryPermissionsAsync,
+    launchImageLibraryAsync,
+    MediaTypeOptions,
+} from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -50,17 +57,74 @@ export default function CreateScreen() {
     const handlePickImage = async () => {
         // TODO 실습 1-1
         // getMediaLibraryPermissionsAsync로 현재 권한 상태(status, canAskAgain)를 확인하세요
+        const { status: currentStatus, canAskAgain } =
+            await getMediaLibraryPermissionsAsync();
+
         // TODO 실습 2-1
         // canAskAgain이 false면 Linking.openSettings()로 설정 앱을 유도하고 return 하세요
+        if (!canAskAgain) {
+            Linking.openSettings();
+            return;
+        }
+
         // TODO 실습 3-1 (iOS)
         // Platform.OS === 'ios'이고 아직 미결정 상태라면
         // 커스텀 Alert로 사용 목적을 먼저 안내한 뒤 시스템 팝업을 띄우세요
+        if (Platform.OS === 'ios' && currentStatus === 'undetermined') {
+            const accepted = await new Promise<boolean>(resolve => {
+                Alert.alert(
+                    '사진 접근 권한 안내',
+                    '게시물에 사진을 첨부하려면 갤러리 접근 권한이 필요합니다.',
+                    [
+                        {
+                            text: '괜찮아요',
+                            style: 'cancel',
+                            onPress: () => resolve(false),
+                        },
+                        {
+                            text: '허용하기',
+                            onPress: () => resolve(true),
+                        },
+                    ],
+                );
+            });
+            if (!accepted) return;
+        }
+
         // TODO 실습 1-2
         // 미허용 상태라면 requestMediaLibraryPermissionsAsync로 권한을 요청하세요
         // 거부 시 Alert 안내 후 return 하세요
+        let granted = currentStatus === 'granted';
+        if (!granted) {
+            const { status: newStatus } =
+                await requestMediaLibraryPermissionsAsync();
+            granted = newStatus === 'granted';
+        }
+        if (!granted) {
+            Alert.alert(
+                '갤러리 접근 권한 필요',
+                '사진을 선택하려면 갤러리 접근 권한이 필요',
+            );
+            return;
+        }
+
         // TODO 실습 1-3
         // launchImageLibraryAsync로 이미지 피커를 실행하고
         // 선택된 asset에서 uri, fileName, mimeType을 추출해 setImages에 저장하세요
+        const result = await launchImageLibraryAsync({
+            mediaTypes: MediaTypeOptions.Images,
+            allowsMultipleSelection: true,
+            quality: 0.8,
+        });
+
+        if (!result.canceled) {
+            const selected: SelectedImage[] = result.assets.map(asset => ({
+                uri: asset.uri,
+                name: asset.fileName ?? 'image.jpg',
+                type: asset.mimeType ?? 'image/jpeg',
+            }));
+            setImages(prev => [...prev, ...selected]);
+        }
     };
 
     const handleRemoveImage = (index: number) => {
