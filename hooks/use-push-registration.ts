@@ -1,6 +1,12 @@
 import { useEffect } from 'react';
 import * as Device from 'expo-device';
 import { useAuthStore } from '@/store/auth-store';
+import {
+    getPermissionsAsync,
+    requestPermissionsAsync,
+    getExpoPushTokenAsync,
+} from 'expo-notifications';
+import { registerPushDevice } from '@/api/push';
 
 /**
  * 로그인된 상태에서 Expo push token을 얻어 서버에 등록합니다.
@@ -27,8 +33,18 @@ async function registerDevice() {
     // getPermissionsAsync로 현재 권한 상태를 확인하고
     // 미허용 시 requestPermissionsAsync로 사용자에게 요청하세요
     // 최종적으로 granted가 아니면 return 처리하세요
+    const { status: permissionStatus } = await getPermissionsAsync();
+    if (permissionStatus !== 'granted') {
+        const { status: newStatus } = await requestPermissionsAsync();
+        if (newStatus !== 'granted') return;
+    }
 
     // TODO 실습 4-2
     // getExpoPushTokenAsync로 Expo Push Token을 발급받고
     // registerPushDevice(token)으로 서버에 전송하세요
+    const { data: token } = await getExpoPushTokenAsync();
+    console.log('Expo Push Token:', token);
+    if (token) {
+        registerPushDevice(token);
+    }
 }
