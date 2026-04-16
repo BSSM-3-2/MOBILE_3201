@@ -13,12 +13,14 @@ const apiClient = axios.create({
 });
 
 // Request Interceptor
-// 모든 요청 전에 실행 — 추후 토큰 주입, 로깅 등을 여기서 처리
+// 모든 요청 전에 실행 — 토큰 주입
 apiClient.interceptors.request.use(
     config => {
-        // TODO: 인증 토큰이 생기면 여기서 주입
-        // const token = getToken();
-        // if (token) config.headers.Authorization = `Bearer ${token}`;
+        // auth-store를 직접 import하면 순환 참조가 생기므로 동적으로 참조
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const { useAuthStore } = require('@/store/auth-store');
+        const token: string | null = useAuthStore.getState().accessToken;
+        if (token) config.headers.Authorization = `Bearer ${token}`;
         return config;
     },
     error => Promise.reject(error),
