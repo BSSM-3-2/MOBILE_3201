@@ -49,12 +49,39 @@ function AuthGuard() {
     useEffect(() => {
         // TODO 실습 7-1
         // addNotificationReceivedListener로 Foreground 수신 이벤트 구독
+        const foregroundSub = Notifications.addNotificationReceivedListener(
+            notification => {
+                console.log('Foreground 알림 수신:', notification);
+            },
+        );
+
         // TODO 실습 7-2
         // addNotificationResponseReceivedListener로 알림 탭 이벤트 구독
+        const responseSub =
+            Notifications.addNotificationResponseReceivedListener(response => {
+                console.log(
+                    '알림 탭:',
+                    response.notification.request.content.data,
+                );
+            });
+
         // TODO 실습 7-3
         // getLastNotificationResponseAsync로 Killed 상태 진입 데이터 확인
+        Notifications.getLastNotificationResponseAsync().then(response => {
+            if (response) {
+                console.log(
+                    'Killed 상태 진입 알림:',
+                    response.notification.request.content.data,
+                );
+            }
+        });
+
         // TODO 실습 7-4 (return)
         // 리스너 클린업 — sub.remove() 호출
+        return () => {
+            foregroundSub.remove();
+            responseSub.remove();
+        };
     }, []);
 
     useEffect(() => {
