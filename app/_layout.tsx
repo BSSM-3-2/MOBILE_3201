@@ -16,6 +16,20 @@ import { ThemedText } from '@components/themed-text';
 import { StyleSheet } from 'react-native';
 import { useAuthStore } from '@/store/auth-store';
 import { usePushRegistration } from '@/hooks/use-push-registration';
+import * as Notifications from 'expo-notifications';
+
+// TODO 실습 5-1
+// setNotificationHandler로 Foreground 배너를 활성화하세요
+// shouldShowAlert, shouldPlaySound 옵션 값을 채워보세요
+Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+        shouldShowAlert: true, // TODO: 배너 표시 여부
+        shouldPlaySound: true, // TODO: 소리 재생 여부
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+    }),
+});
 
 SplashScreen.preventAutoHideAsync();
 
