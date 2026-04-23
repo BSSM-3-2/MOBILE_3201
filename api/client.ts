@@ -26,6 +26,12 @@ apiClient.interceptors.request.use(
     error => Promise.reject(error),
 );
 
+let isRefreshing = false;
+let pendingQueue: {
+    resolve: (token: string) => void;
+    reject: (err: unknown) => void;
+}[] = [];
+
 // Response Interceptor
 // 모든 응답 후에 실행 — 에러 코드를 한 곳에서 처리
 apiClient.interceptors.response.use(
@@ -42,16 +48,38 @@ apiClient.interceptors.response.use(
             // eslint-disable-next-line @typescript-eslint/no-require-imports
             const { useAuthStore } = require('@/store/auth-store');
             const store = useAuthStore.getState();
+            const originalConfig = error.config;
 
             // TODO 실습 4-3: store.logOut()을 호출하세요
-            store.logOut();
 
             // TODO 실습 5-2: logOut 대신 토큰 갱신을 시도하고 원본 요청을 재시도하세요
             //   - isRefreshing 플래그로 중복 갱신 방지
             //   - 갱신 중 들어온 요청은 pendingQueue에 쌓아두었다가 완료 후 일괄 처리
             //   - 갱신 실패 시 store.logOut() 호출
+            if (isRefreshing) {
+                return new Promise<string>((resolve, reject) => {
+                    pendingQueue.push({ resolve, reject });
+                }).then(token => {
+                    originalConfig.headers.Authorization = `Bearer ${token}`;
+                    return apiClient(originalConfig);
+                });
+            }
 
-            return Promise.reject(error);
+            isRefreshing = true;
+            try {
+                const newToken = await store.refreshAccessToken();
+                pendingQueue.forEach(({ resolve }) => resolve(newToken));
+                pendingQueue = [];
+                originalConfig.headers.Authorization = `Bearer ${newToken}`;
+                return apiClient(originalConfig);
+            } catch {
+                pendingQueue.forEach(({ reject }) => reject(error));
+                pendingQueue = [];
+                await store.logOut();
+                return Promise.reject(error);
+            } finally {
+                isRefreshing = false;
+            }
         }
 
         console.error('[API] 서버 에러:', status, error.message);
