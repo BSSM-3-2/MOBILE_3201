@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
-import { View, ActivityIndicator, LayoutChangeEvent } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, TouchableOpacity } from 'react-native';
 import NavigationTop from '@components/navigation/NavigationTop';
 import ContentContainer from '@components/container';
 import { FeedList } from '@components/feed/FeedList';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedView } from '@components/themed-view';
 import { useFeedStore } from '@/store/feed-store';
+import { useRouter } from 'expo-router';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
@@ -15,71 +16,55 @@ import Animated, {
 
 export default function HomeScreen() {
     const { posts, loading, fetchFeed, loadMore } = useFeedStore();
-    const [headerHeight, setHeaderHeight] = useState(0);
+    const router = useRouter();
 
-    // TODO: scrollY 선언 (실습 6-4)
+    // scrollY: 스크롤 위치를 UI 스레드에서 직접 추적하는 SharedValue
     const scrollY = useSharedValue(0);
 
-    // TODO: headerAnimatedStyle 정의 (실습 6-5)
-    const headerAnimatedStyle = useAnimatedStyle(() => {
-        const translateY = interpolate(
+    // useAnimatedStyle: scrollY 변화에 따라 헤더를 UI 스레드에서 직접 변환
+    // interpolate: 입력 범위 [0, 80] → 출력 범위 매핑 (Extrapolation.CLAMP: 범위 초과 시 고정)
+    const headerAnimatedStyle = useAnimatedStyle(() => ({
+        transform: [
+            {
+                translateY: interpolate(
+                    scrollY.value,
+                    [0, 80],
+                    [0, -80],
+                    Extrapolation.CLAMP,
+                ),
+            },
+        ],
+        opacity: interpolate(
             scrollY.value,
-            [0, headerHeight],
-            [0, -headerHeight],
-            Extrapolation.CLAMP,
-        );
-        const opacity = interpolate(
-            scrollY.value,
-            [0, headerHeight / 2],
+            [0, 60],
             [1, 0],
             Extrapolation.CLAMP,
-        );
-        return { transform: [{ translateY }], opacity };
-    });
-
-    const handleHeaderLayout = (e: LayoutChangeEvent) => {
-        setHeaderHeight(e.nativeEvent.layout.height);
-    };
+        ),
+    }));
 
     useEffect(() => {
         fetchFeed();
     }, []);
 
     return (
-        <ThemedView style={{ flex: 1 }}>
-            {/* TODO: Animated.View + headerAnimatedStyle (실습 6-6) */}
-            <Animated.View
-                onLayout={handleHeaderLayout}
-                style={[
-                    {
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        zIndex: 10,
-                    },
-                    headerAnimatedStyle,
-                ]}
-            >
+        <ThemedView style={{ flex: 1, overflow: 'hidden' }}>
+            {/* Animated.View: headerAnimatedStyle 적용 — 스크롤에 따라 헤더 숨김 */}
+            <Animated.View style={headerAnimatedStyle}>
                 <ContentContainer isTopElement={true}>
                     <NavigationTop
                         title='MyFeed'
                         icon={'layers'}
                         rightButtons={
-                            <View
-                                style={{
-                                    flexDirection: 'row',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    gap: 15,
-                                }}
+                            <TouchableOpacity
+                                onPress={() => router.push('/create' as never)}
+                                hitSlop={8}
                             >
                                 <Ionicons
                                     name='add-outline'
-                                    size={24}
+                                    size={28}
                                     color='#262626'
                                 />
-                            </View>
+                            </TouchableOpacity>
                         }
                     />
                 </ContentContainer>
@@ -88,12 +73,11 @@ export default function HomeScreen() {
             {loading && posts.length === 0 ? (
                 <ActivityIndicator style={{ flex: 1 }} />
             ) : (
-                // TODO: scrollY 전달 (실습 6-7)
+                // scrollY를 FeedList에 전달 → useAnimatedScrollHandler가 내부에서 처리
                 <FeedList
                     posts={posts}
                     onEndReached={loadMore}
                     scrollY={scrollY}
-                    headerHeight={headerHeight}
                 />
             )}
         </ThemedView>

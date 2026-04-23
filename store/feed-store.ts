@@ -12,8 +12,8 @@ interface FeedState {
     fetchFeed: () => Promise<void>;
     loadMore: () => Promise<void>;
     toggleLike: (postId: string) => Promise<void>;
-    prependPost: (post: Post) => void;
     removePost: (postId: string) => void;
+    prependPost: (post: Post) => void;
 }
 
 export const useFeedStore = create<FeedState>((set, get) => ({
@@ -107,10 +107,11 @@ export const useFeedStore = create<FeedState>((set, get) => ({
         }
     },
 
+    removePost: (postId: string) => {
+        set({ posts: get().posts.filter(p => p.id !== postId) });
+    },
+
     prependPost: (post: Post) => {
         set({ posts: [post, ...get().posts] });
     },
-
-    // TODO: removePost 구현 (실습 4-5)
-    removePost: (_postId: string) => {},
 }));

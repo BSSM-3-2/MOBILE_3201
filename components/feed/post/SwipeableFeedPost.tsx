@@ -4,14 +4,13 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
     useSharedValue,
     useAnimatedStyle,
+    withTiming,
     withSpring,
-    clamp,
     runOnJS,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Post } from '@type/Post';
 import { FeedPost } from './FeedPost';
-import { useThemeColor } from '@/hooks/use-theme-color';
 
 const DELETE_AREA_WIDTH = 80;
 const DELETE_THRESHOLD = -60;
@@ -23,54 +22,60 @@ function SwipeableFeedPost({
     post: Post;
     onDelete: (id: string) => void;
 }) {
-    const backgroundColor = useThemeColor({}, 'background');
-
-    // TODO: translateX 선언 (실습 4-1)
+    // 수평 이동 (스와이프 삭제)
     const translateX = useSharedValue(0);
-    // TODO: cardScale 선언 (실습 5-1)
+    // 카드 크기 (롱프레스 피드백)
     const cardScale = useSharedValue(1);
 
-    // TODO: panGesture 정의 (실습 4-2)
+    // --- Gesture.Pan: 스와이프 삭제 ---
     const panGesture = Gesture.Pan()
         .activeOffsetX([-10, 10])
         .onUpdate(e => {
-            translateX.value = clamp(e.translationX, -DELETE_AREA_WIDTH, 0);
+            translateX.value = Math.min(
+                0,
+                Math.max(e.translationX, -DELETE_AREA_WIDTH),
+            );
         })
-        .onEnd(() => {
-            if (translateX.value < DELETE_THRESHOLD) {
-                translateX.value = withSpring(-DELETE_AREA_WIDTH);
+        .onEnd(e => {
+            if (e.translationX < DELETE_THRESHOLD) {
+                translateX.value = withTiming(-DELETE_AREA_WIDTH);
             } else {
-                translateX.value = withSpring(0);
+                translateX.value = withTiming(0);
             }
         });
 
-    // TODO: longPressGesture 정의 (실습 5-2)
+    // --- Gesture.LongPress: 롱프레스 피드백 ---
     const longPressGesture = Gesture.LongPress()
-        .onBegin(() => {
-            cardScale.value = withSpring(0.95);
-        })
+        .minDuration(400)
         .onStart(() => {
+            // SharedValue 수정 — UI 스레드 직접 실행
+            cardScale.value = withSpring(0.96, { damping: 8 });
+            // Haptics는 네이티브 JS 함수 → runOnJS 필요
             runOnJS(Haptics.impactAsync)(Haptics.ImpactFeedbackStyle.Medium);
         })
+        .onEnd(() => {
+            cardScale.value = withSpring(1, { damping: 8 });
+        })
         .onFinalize(() => {
-            cardScale.value = withSpring(1);
+            // 제스처가 어떻게 끝나든 scale 복구 (취소/완료 모두)
+            cardScale.value = withSpring(1, { damping: 8 });
         });
 
-    // TODO: Gesture.Race로 합성 (실습 5-3)
+    // Gesture.Race: 먼저 활성화되는 제스처가 나머지를 취소
+    // - 빠른 스와이프 → Pan 활성화 → LongPress 취소
+    // - 400ms 정지  → LongPress 활성화 → Pan 취소
     const composedGesture = Gesture.Race(longPressGesture, panGesture);
 
-    // TODO: animatedStyle 정의 (실습 4-3)
-    const slideStyle = useAnimatedStyle(() => ({
-        transform: [{ translateX: translateX.value }],
-    }));
-    const scaleStyle = useAnimatedStyle(() => ({
-        transform: [{ scale: cardScale.value }],
+    const animatedStyle = useAnimatedStyle(() => ({
+        transform: [
+            { translateX: translateX.value },
+            { scale: cardScale.value },
+        ],
     }));
 
-    // TODO: handleDeletePress 작성 (실습 4-4)
     const handleDeletePress = () => {
-        translateX.value = withSpring(0);
-        onDelete(post.id);
+        translateX.value = withTiming(0);
+        runOnJS(onDelete)(post.id);
     };
 
     return (
@@ -85,10 +90,10 @@ function SwipeableFeedPost({
             </View>
 
             <GestureDetector gesture={composedGesture}>
-                <Animated.View style={[slideStyle, { backgroundColor }]}>
-                    <Animated.View style={scaleStyle}>
-                        <FeedPost post={post} />
-                    </Animated.View>
+                <Animated.View
+                    style={[animatedStyle, { backgroundColor: '#FFF' }]}
+                >
+                    <FeedPost post={post} />
                 </Animated.View>
             </GestureDetector>
         </View>

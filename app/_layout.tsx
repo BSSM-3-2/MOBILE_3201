@@ -18,13 +18,11 @@ import { useAuthStore } from '@/store/auth-store';
 import { usePushRegistration } from '@/hooks/use-push-registration';
 import * as Notifications from 'expo-notifications';
 
-// TODO 실습 5-1
-// setNotificationHandler로 Foreground 배너를 활성화하세요
-// shouldShowAlert, shouldPlaySound 옵션 값을 채워보세요
+// 포그라운드에서도 알림 배너가 보이도록 설정
 Notifications.setNotificationHandler({
     handleNotification: async () => ({
-        shouldShowAlert: true, // TODO: 배너 표시 여부
-        shouldPlaySound: true, // TODO: 소리 재생 여부
+        shouldShowAlert: true,
+        shouldPlaySound: true,
         shouldSetBadge: false,
         shouldShowBanner: true,
         shouldShowList: true,
@@ -40,51 +38,17 @@ export const unstable_settings = {
 const AUTH_ROUTES = new Set(['login', 'signup']);
 
 function AuthGuard() {
-    const { accessToken } = useAuthStore();
+    const { accessToken, status /* TODO 실습 2: status도 꺼내세요 */ } =
+        useAuthStore();
     const segments = useSegments();
     const router = useRouter();
 
     usePushRegistration();
 
     useEffect(() => {
-        // TODO 실습 7-1
-        // addNotificationReceivedListener로 Foreground 수신 이벤트 구독
-        const foregroundSub = Notifications.addNotificationReceivedListener(
-            notification => {
-                console.log('Foreground 알림 수신:', notification);
-            },
-        );
+        // TODO 실습 2: status === 'checking' 이면 return으로 라우팅을 보류하세요
+        if (status === 'checking') return;
 
-        // TODO 실습 7-2
-        // addNotificationResponseReceivedListener로 알림 탭 이벤트 구독
-        const responseSub =
-            Notifications.addNotificationResponseReceivedListener(response => {
-                console.log(
-                    '알림 탭:',
-                    response.notification.request.content.data,
-                );
-            });
-
-        // TODO 실습 7-3
-        // getLastNotificationResponseAsync로 Killed 상태 진입 데이터 확인
-        Notifications.getLastNotificationResponseAsync().then(response => {
-            if (response) {
-                console.log(
-                    'Killed 상태 진입 알림:',
-                    response.notification.request.content.data,
-                );
-            }
-        });
-
-        // TODO 실습 7-4 (return)
-        // 리스너 클린업 — sub.remove() 호출
-        return () => {
-            foregroundSub.remove();
-            responseSub.remove();
-        };
-    }, []);
-
-    useEffect(() => {
         const currentRoute = segments[0] as string | undefined;
         const inAuthRoute = AUTH_ROUTES.has(currentRoute ?? '');
 
@@ -93,12 +57,14 @@ function AuthGuard() {
         } else if (accessToken && inAuthRoute) {
             router.replace('/(tabs)');
         }
-    }, [accessToken, segments]);
+    }, [accessToken, status, segments]); // TODO 실습 2: 의존성 배열에 status를 추가하세요
 
     return null;
 }
 
 export default function RootLayout() {
+    const { bootstrap /* TODO 실습 3: bootstrap을 꺼내세요 */ } =
+        useAuthStore();
     const colorScheme = useColorScheme();
     const [loaded] = useFonts({
         'Pretendard-Regular': require('../assets/fonts/Pretendard-Regular.otf'),
@@ -107,6 +73,11 @@ export default function RootLayout() {
         'Pretendard-Bold': require('../assets/fonts/Pretendard-Bold.otf'),
         'Pretendard-ExtraBold': require('../assets/fonts/Pretendard-ExtraBold.otf'),
     });
+
+    // TODO 실습 3: 앱 시작 시 bootstrap()을 한 번 호출하세요 (의존성 배열 [])
+    useEffect(() => {
+        bootstrap();
+    }, []);
 
     useEffect(() => {
         if (loaded) SplashScreen.hideAsync();

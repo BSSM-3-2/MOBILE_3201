@@ -15,11 +15,11 @@ function FeedPost({ post }: { post: Post }) {
 
     if (!user) return null;
 
-    // TODO: 최신 liked 상태 가져오기 (실습 3-6)
+    // 스토어에서 최신 liked 상태를 가져와 더블탭 중복 좋아요 방지
     const currentPost = posts.find(p => p.id === post.id);
     const liked = currentPost?.liked ?? post.liked;
 
-    // TODO: handleDoubleTap 작성 (실습 3-7)
+    // 이미 좋아요한 경우 더블탭 무시 (인스타그램 동작과 동일)
     const handleDoubleTap = () => {
         if (!liked) toggleLike(post.id);
     };
@@ -27,11 +27,12 @@ function FeedPost({ post }: { post: Post }) {
     return (
         <ThemedView style={styles.feedMargin}>
             <FeedPostHeader user={user} />
-            {/* TODO: onDoubleTap 연결 (실습 3-8) */}
-            <FeedImage
-                image={resolveImageSource(post.images[0])}
-                onDoubleTap={handleDoubleTap}
-            />
+            {post.images[0] && (
+                <FeedImage
+                    image={resolveImageSource(post.images[0])}
+                    onDoubleTap={handleDoubleTap}
+                />
+            )}
             <ContentContainer style={{ gap: 4 }}>
                 <FeedPostActions
                     postId={post.id}

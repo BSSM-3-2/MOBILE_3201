@@ -10,20 +10,10 @@ import {
     ActivityIndicator,
     Alert,
     Platform,
-    Linking,
 } from 'react-native';
-import {
-    getMediaLibraryPermissionsAsync,
-    requestMediaLibraryPermissionsAsync,
-    launchImageLibraryAsync,
-    MediaTypeOptions,
-} from 'expo-image-picker';
-import {
-    getPermissionsAsync,
-    scheduleNotificationAsync,
-    SchedulableTriggerInputTypes,
-} from 'expo-notifications';
 import { useRouter } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import * as Notifications from 'expo-notifications';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createPost } from '@/api/content';
@@ -38,27 +28,16 @@ interface SelectedImage {
 
 // 업로드 성공 후 로컬 알림 예약
 async function scheduleUploadNotification(caption: string) {
-    // TODO 실습 6-1
-    // getPermissionsAsync로 알림 권한을 확인하고 미허용이면 return 하세요
-    // scheduleNotificationAsync로 로컬 알림을 발송하세요
-    // content에 title, body를 구성하고
-    const { status } = await getPermissionsAsync();
+    const { status } = await Notifications.getPermissionsAsync();
     if (status !== 'granted') return;
 
-    // TODO 실습 6-2
-    // trigger: { seconds: N }으로 N초 딜레이 발송을 테스트해보세요
-    await scheduleNotificationAsync({
+    await Notifications.scheduleNotificationAsync({
         content: {
-            title: '게시물 업로드 완료',
-            body: caption
-                ? `"${caption}" 게시물이 업로드됐습니다.`
-                : '게시물이 업로드됐습니다.',
-            data: { caption },
+            title: '게시물이 업로드됐어요!',
+            body: caption ? `"${caption}"` : '새 게시물이 피드에 올라갔습니다.',
+            sound: 'default',
         },
-        trigger: {
-            type: SchedulableTriggerInputTypes.TIME_INTERVAL,
-            seconds: 3,
-        },
+        trigger: null, // 즉시 발송
     });
 }
 
@@ -76,76 +55,60 @@ export default function CreateScreen() {
 
     // ── 이미지 선택 ──────────────────────────────────────────────
     const handlePickImage = async () => {
-        // TODO 실습 1-1
-        // getMediaLibraryPermissionsAsync로 현재 권한 상태(status, canAskAgain)를 확인하세요
-        const { status: currentStatus, canAskAgain } =
-            await getMediaLibraryPermissionsAsync();
+        // 1) 권한 확인
+        const { status, canAskAgain } =
+            await ImagePicker.getMediaLibraryPermissionsAsync();
 
-        // TODO 실습 2-1
-        // canAskAgain이 false면 Linking.openSettings()로 설정 앱을 유도하고 return 하세요
-        if (!canAskAgain) {
-            Linking.openSettings();
-            return;
-        }
-
-        // TODO 실습 3-1 (iOS)
-        // Platform.OS === 'ios'이고 아직 미결정 상태라면
-        // 커스텀 Alert로 사용 목적을 먼저 안내한 뒤 시스템 팝업을 띄우세요
-        if (Platform.OS === 'ios' && currentStatus === 'undetermined') {
-            const accepted = await new Promise<boolean>(resolve => {
+        if (status !== 'granted') {
+            if (!canAskAgain) {
+                // 이미 거부됐고 다시 물을 수 없는 상태 → 설정 안내
                 Alert.alert(
-                    '사진 접근 권한 안내',
-                    '게시물에 사진을 첨부하려면 갤러리 접근 권한이 필요합니다.',
-                    [
-                        {
-                            text: '괜찮아요',
-                            style: 'cancel',
-                            onPress: () => resolve(false),
-                        },
-                        {
-                            text: '허용하기',
-                            onPress: () => resolve(true),
-                        },
-                    ],
+                    '사진 접근 권한 필요',
+                    '사진을 첨부하려면 설정에서 앨범 접근을 허용해 주세요.',
+                    [{ text: '확인' }],
                 );
-            });
-            if (!accepted) return;
-        }
+                return;
+            }
 
-        // TODO 실습 1-2
-        // 미허용 상태라면 requestMediaLibraryPermissionsAsync로 권한을 요청하세요
-        // 거부 시 Alert 안내 후 return 하세요
-        let granted = currentStatus === 'granted';
-        if (!granted) {
+            // 2) 권한 요청
             const { status: newStatus } =
-                await requestMediaLibraryPermissionsAsync();
-            granted = newStatus === 'granted';
-        }
-        if (!granted) {
-            Alert.alert(
-                '갤러리 접근 권한 필요',
-                '사진을 선택하려면 갤러리 접근 권한이 필요',
-            );
-            return;
+                await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+            if (newStatus !== 'granted') {
+                Alert.alert(
+                    '권한 거부됨',
+                    '앨범 접근 권한이 없어 사진을 선택할 수 없습니다.',
+                    [{ text: '확인' }],
+                );
+                return;
+            }
         }
 
-        // TODO 실습 1-3
-        // launchImageLibraryAsync로 이미지 피커를 실행하고
-        // 선택된 asset에서 uri, fileName, mimeType을 추출해 setImages에 저장하세요
-        const result = await launchImageLibraryAsync({
-            mediaTypes: MediaTypeOptions.Images,
+        // 3) 이미지 피커 실행
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
             allowsMultipleSelection: true,
-            quality: 0.8,
+            selectionLimit: 10,
+            quality: 0.85,
+            orderedSelection: true,
         });
 
-        if (!result.canceled) {
-            const selected: SelectedImage[] = result.assets.map(asset => ({
-                uri: asset.uri,
-                name: asset.fileName ?? 'image.jpg',
-                type: asset.mimeType ?? 'image/jpeg',
-            }));
-            setImages(prev => [...prev, ...selected]);
-        }
+        if (result.canceled) return;
+
+        const picked: SelectedImage[] = result.assets.map(asset => {
+            const uri = asset.uri;
+            const ext = uri.split('.').pop() ?? 'jpg';
+            return {
+                uri,
+                name: asset.fileName ?? `photo_${Date.now()}.${ext}`,
+                type: asset.mimeType ?? `image/${ext}`,
+            };
+        });
+
+        setImages(prev => {
+            const combined = [...prev, ...picked];
+            return combined.slice(0, 10); // 최대 10장
+        });
     };
 
     const handleRemoveImage = (index: number) => {
