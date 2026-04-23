@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import User from '@type/User';
 import { signup, login, SignupPayload, LoginPayload } from '@/api/auth';
+import * as expoSecureStore from 'expo-secure-store';
+import { getMe } from '@/api/users';
 // TODO 실습 1: expo-secure-store를 import하세요
 // TODO 실습 4: api/auth에서 logout을 import하세요
 // TODO 실습 5: api/auth에서 refreshToken을 import하세요
@@ -9,12 +11,14 @@ const TOKEN_KEY = 'accessToken';
 const REFRESH_KEY = 'refreshToken';
 
 // TODO 실습 2: 'checking' | 'authenticated' | 'guest' 타입을 정의하고 export하세요
+export type AuthStatus = 'checking' | 'authenticated' | 'guest';
 
 interface AuthState {
     user: User | null;
     accessToken: string | null;
     refreshToken: string | null;
     // TODO 실습 2: status 필드를 추가하세요
+    status: AuthStatus;
     loading: boolean;
     error: string | null;
 
@@ -32,6 +36,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     accessToken: null,
     refreshToken: null,
     // TODO 실습 2-1: status 초기값을 설정하세요
+    status: 'checking',
     loading: false,
     error: null,
 
@@ -42,7 +47,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // 3. set({ accessToken })으로 interceptor가 헤더를 붙이도록 임시 세팅
         // 4. getMe()로 서버 검증
         // 5. 성공 → status 'authenticated' / 실패 → 토큰 삭제 후 'guest'
-        set({ status: 'guest' } as never); // 임시 — 실습 3 완료 후 삭제
+        const stored = await expoSecureStore.getItemAsync(TOKEN_KEY);
+        if (!stored) {
+            set({ status: 'guest' });
+            return;
+        }
+        const storedRefresh = await expoSecureStore.getItemAsync(REFRESH_KEY);
+        set({ accessToken: stored, refreshToken: storedRefresh });
+        try {
+            const user = await getMe();
+            set({ status: 'authenticated', user });
+        } catch {
+            await expoSecureStore.deleteItemAsync(TOKEN_KEY);
+            await expoSecureStore.deleteItemAsync(REFRESH_KEY);
+            set({ accessToken: null, refreshToken: null, status: 'guest' });
+        }
     },
 
     signUp: async payload => {
@@ -50,11 +69,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             const res = await signup(payload);
             // TODO 실습 1-1: accessToken, refreshToken을 SecureStore에 저장하세요
+            await expoSecureStore.setItemAsync(TOKEN_KEY, res.accessToken);
+            await expoSecureStore.setItemAsync(REFRESH_KEY, res.refreshToken);
             set({
                 user: res.user,
                 accessToken: res.accessToken,
                 refreshToken: res.refreshToken,
                 // TODO 실습 2-2: status를 'authenticated'로 설정하세요
+                status: 'authenticated',
                 loading: false,
             });
         } catch (err: unknown) {
@@ -74,11 +96,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         try {
             const res = await login(payload);
             // TODO 실습 1-2: accessToken, refreshToken을 SecureStore에 저장하세요
+            await expoSecureStore.setItemAsync(TOKEN_KEY, res.accessToken);
+            await expoSecureStore.setItemAsync(REFRESH_KEY, res.refreshToken);
             set({
                 user: res.user,
                 accessToken: res.accessToken,
                 refreshToken: res.refreshToken,
                 // TODO 실습 2-3: status를 'authenticated'로 설정하세요
+                status: 'authenticated',
                 loading: false,
             });
         } catch (err: unknown) {
@@ -96,11 +121,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     logOut: async () => {
         // TODO 실습 4-1: get().refreshToken으로 서버에 폐기 요청 (실패해도 계속 진행)
         // TODO 실습 1-3: SecureStore에서 TOKEN_KEY, REFRESH_KEY를 삭제하세요
+        await expoSecureStore.deleteItemAsync(TOKEN_KEY);
+        await expoSecureStore.deleteItemAsync(REFRESH_KEY);
         set({
             user: null,
             accessToken: null,
             refreshToken: null,
             // TODO 실습 2-4: status를 'guest'로 설정하세요
+            status: 'guest',
             error: null,
         });
     },
