@@ -14,6 +14,12 @@ import Animated, {
     Extrapolation,
 } from 'react-native-reanimated';
 
+// TODO 5-1. 피드 로드 실패 시 표시할 FeedError 컴포넌트를 만드세요.
+//           props: message(string), onRetry(() => void)
+//           내용: 에러 메시지 텍스트 + "다시 시도" 버튼
+//           주의: Error Boundary는 async 에러(fetchFeed 실패)를 잡지 못합니다.
+//                 store의 error 상태를 직접 읽어 UI에 표시해야 합니다.
+
 export default function HomeScreen() {
     const { posts, loading, fetchFeed, loadMore } = useFeedStore();
     const router = useRouter();
@@ -70,6 +76,8 @@ export default function HomeScreen() {
                 </ContentContainer>
             </Animated.View>
 
+            {/* TODO 5-2. error가 있고 posts.length === 0이면 FeedError를 표시하세요.
+                         그 외: loading 중이면 ActivityIndicator, 아니면 FeedList */}
             {loading && posts.length === 0 ? (
                 <ActivityIndicator style={{ flex: 1 }} />
             ) : (

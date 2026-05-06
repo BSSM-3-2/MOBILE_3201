@@ -28,6 +28,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         favicon: './assets/images/favicon.png',
     },
     plugins: [
+        '@sentry/react-native/expo',
         'expo-router',
         'expo-secure-store',
         [

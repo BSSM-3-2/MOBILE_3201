@@ -10,6 +10,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import * as Sentry from '@sentry/react-native';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { ThemedText } from '@components/themed-text';
@@ -17,6 +18,13 @@ import { StyleSheet } from 'react-native';
 import { useAuthStore } from '@/store/auth-store';
 import { usePushRegistration } from '@/hooks/use-push-registration';
 import * as Notifications from 'expo-notifications';
+
+Sentry.init({
+    dsn: process.env.EXPO_PUBLIC_SENTRY_DSN,
+    environment: __DEV__ ? 'dev' : 'prod',
+    tracesSampleRate: 0.1,
+    enabled: !__DEV__,
+});
 
 // 포그라운드에서도 알림 배너가 보이도록 설정
 Notifications.setNotificationHandler({
@@ -38,15 +46,14 @@ export const unstable_settings = {
 const AUTH_ROUTES = new Set(['login', 'signup']);
 
 function AuthGuard() {
-    const { accessToken, status /* TODO 실습 2: status도 꺼내세요 */ } =
-        useAuthStore();
+    const { accessToken, status } = useAuthStore();
     const segments = useSegments();
     const router = useRouter();
 
     usePushRegistration();
 
     useEffect(() => {
-        // TODO 실습 2: status === 'checking' 이면 return으로 라우팅을 보류하세요
+        // checking 중에는 라우팅하지 않음 — Splash가 유지되는 동안 대기
         if (status === 'checking') return;
 
         const currentRoute = segments[0] as string | undefined;
@@ -57,14 +64,13 @@ function AuthGuard() {
         } else if (accessToken && inAuthRoute) {
             router.replace('/(tabs)');
         }
-    }, [accessToken, status, segments]); // TODO 실습 2: 의존성 배열에 status를 추가하세요
+    }, [accessToken, status, segments]);
 
     return null;
 }
 
 export default function RootLayout() {
-    const { bootstrap /* TODO 실습 3: bootstrap을 꺼내세요 */ } =
-        useAuthStore();
+    const { bootstrap } = useAuthStore();
     const colorScheme = useColorScheme();
     const [loaded] = useFonts({
         'Pretendard-Regular': require('../assets/fonts/Pretendard-Regular.otf'),
@@ -74,7 +80,7 @@ export default function RootLayout() {
         'Pretendard-ExtraBold': require('../assets/fonts/Pretendard-ExtraBold.otf'),
     });
 
-    // TODO 실습 3: 앱 시작 시 bootstrap()을 한 번 호출하세요 (의존성 배열 [])
+    // 앱 시작 시 한 번 — SecureStore 토큰 조회 → 서버 검증 → status 결정
     useEffect(() => {
         bootstrap();
     }, []);
@@ -90,6 +96,8 @@ export default function RootLayout() {
             <ThemeProvider
                 value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}
             >
+                {/* TODO 2. 전역 ErrorBoundary로 AuthGuard와 Stack 전체를 감싸세요.
+                    onError: err => console.error('[GlobalBoundary]', err.message) */}
                 <AuthGuard />
                 <Stack>
                     <Stack.Screen

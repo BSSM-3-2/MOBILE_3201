@@ -1,30 +1,24 @@
 import { create } from 'zustand';
+import * as SecureStore from 'expo-secure-store';
 import User from '@type/User';
 import {
     signup,
     login,
-    logout,
+    logout as authLogout,
     refreshToken as authRefresh,
     SignupPayload,
     LoginPayload,
 } from '@/api/auth';
-import * as expoSecureStore from 'expo-secure-store';
-import { getMe } from '@/api/users';
-// TODO 실습 1: expo-secure-store를 import하세요
-// TODO 실습 4: api/auth에서 logout을 import하세요
-// TODO 실습 5: api/auth에서 refreshToken을 import하세요
 
 const TOKEN_KEY = 'accessToken';
 const REFRESH_KEY = 'refreshToken';
 
-// TODO 실습 2: 'checking' | 'authenticated' | 'guest' 타입을 정의하고 export하세요
 export type AuthStatus = 'checking' | 'authenticated' | 'guest';
 
 interface AuthState {
     user: User | null;
     accessToken: string | null;
     refreshToken: string | null;
-    // TODO 실습 2: status 필드를 추가하세요
     status: AuthStatus;
     loading: boolean;
     error: string | null;
@@ -42,32 +36,46 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     user: null,
     accessToken: null,
     refreshToken: null,
-    // TODO 실습 2-1: status 초기값을 설정하세요
     status: 'checking',
     loading: false,
     error: null,
 
+    // 앱 시작 시 한 번 호출 — 저장된 토큰으로 세션 복원
     bootstrap: async () => {
-        // TODO 실습 3: 다음 흐름을 구현하세요
-        // 1. SecureStore에서 accessToken을 읽는다
-        // 2. 없으면 status 'guest'로 설정 후 return
-        // 3. set({ accessToken })으로 interceptor가 헤더를 붙이도록 임시 세팅
-        // 4. getMe()로 서버 검증
-        // 5. 성공 → status 'authenticated' / 실패 → 토큰 삭제 후 'guest'
-        const stored = await expoSecureStore.getItemAsync(TOKEN_KEY);
-        if (!stored) {
-            set({ status: 'guest' });
-            return;
-        }
-        const storedRefresh = await expoSecureStore.getItemAsync(REFRESH_KEY);
-        set({ accessToken: stored, refreshToken: storedRefresh });
         try {
+            const token = await SecureStore.getItemAsync(TOKEN_KEY);
+
+            if (!token) {
+                set({ status: 'guest' });
+                return;
+            }
+
+            // store에 임시 세팅해야 apiClient interceptor가 Bearer 헤더를 붙임
+            set({ accessToken: token });
+
+            // 저장된 토큰이 있다는 것과 유효하다는 것은 다르다
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { getMe } = require('@/api/users');
             const user = await getMe();
-            set({ status: 'authenticated', user });
+
+            const storedRefreshToken =
+                await SecureStore.getItemAsync(REFRESH_KEY);
+            set({
+                user,
+                accessToken: token,
+                refreshToken: storedRefreshToken,
+                status: 'authenticated',
+            });
         } catch {
-            await expoSecureStore.deleteItemAsync(TOKEN_KEY);
-            await expoSecureStore.deleteItemAsync(REFRESH_KEY);
-            set({ accessToken: null, refreshToken: null, status: 'guest' });
+            // 만료·폐기된 토큰은 즉시 제거
+            await SecureStore.deleteItemAsync(TOKEN_KEY);
+            await SecureStore.deleteItemAsync(REFRESH_KEY);
+            set({
+                user: null,
+                accessToken: null,
+                refreshToken: null,
+                status: 'guest',
+            });
         }
     },
 
@@ -75,14 +83,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ loading: true, error: null });
         try {
             const res = await signup(payload);
-            // TODO 실습 1-1: accessToken, refreshToken을 SecureStore에 저장하세요
-            await expoSecureStore.setItemAsync(TOKEN_KEY, res.accessToken);
-            await expoSecureStore.setItemAsync(REFRESH_KEY, res.refreshToken);
+            await SecureStore.setItemAsync(TOKEN_KEY, res.accessToken);
+            await SecureStore.setItemAsync(REFRESH_KEY, res.refreshToken);
             set({
                 user: res.user,
                 accessToken: res.accessToken,
                 refreshToken: res.refreshToken,
-                // TODO 실습 2-2: status를 'authenticated'로 설정하세요
                 status: 'authenticated',
                 loading: false,
             });
@@ -102,14 +108,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ loading: true, error: null });
         try {
             const res = await login(payload);
-            // TODO 실습 1-2: accessToken, refreshToken을 SecureStore에 저장하세요
-            await expoSecureStore.setItemAsync(TOKEN_KEY, res.accessToken);
-            await expoSecureStore.setItemAsync(REFRESH_KEY, res.refreshToken);
+            await SecureStore.setItemAsync(TOKEN_KEY, res.accessToken);
+            await SecureStore.setItemAsync(REFRESH_KEY, res.refreshToken);
             set({
                 user: res.user,
                 accessToken: res.accessToken,
                 refreshToken: res.refreshToken,
-                // TODO 실습 2-3: status를 'authenticated'로 설정하세요
                 status: 'authenticated',
                 loading: false,
             });
@@ -125,35 +129,40 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         }
     },
 
+    // SecureStore 삭제 → store 초기화 순서 반드시 지키기
     logOut: async () => {
-        // TODO 실습 4-1: get().refreshToken으로 서버에 폐기 요청 (실패해도 계속 진행)
-        const rt = get().refreshToken;
-        if (rt) logout(rt).catch(() => {});
-        // TODO 실습 1-3: SecureStore에서 TOKEN_KEY, REFRESH_KEY를 삭제하세요
-        await expoSecureStore.deleteItemAsync(TOKEN_KEY);
-        await expoSecureStore.deleteItemAsync(REFRESH_KEY);
+        const currentRefreshToken = get().refreshToken;
+
+        // 서버에 refresh token 폐기 요청 — 실패해도 로컬 정리는 반드시 진행
+        if (currentRefreshToken) {
+            authLogout(currentRefreshToken).catch(() => {});
+        }
+
+        await SecureStore.deleteItemAsync(TOKEN_KEY);
+        await SecureStore.deleteItemAsync(REFRESH_KEY);
         set({
             user: null,
             accessToken: null,
             refreshToken: null,
-            // TODO 실습 2-4: status를 'guest'로 설정하세요
             status: 'guest',
             error: null,
         });
     },
 
+    // 401 발생 시 client.ts 인터셉터에서 호출 — 새 accessToken 반환
     refreshAccessToken: async () => {
-        // TODO 실습 5-1: 다음 흐름을 구현하세요
-        // 1. get().refreshToken이 없으면 throw new Error('No refresh token')
-        // 2. authRefresh(currentRefreshToken)으로 새 토큰 발급
-        // 3. SecureStore와 store 양쪽 모두 업데이트
-        // 4. 새 accessToken을 반환
         const currentRefreshToken = get().refreshToken;
         if (!currentRefreshToken) throw new Error('No refresh token');
+
         const res = await authRefresh(currentRefreshToken);
-        await expoSecureStore.setItemAsync(TOKEN_KEY, res.accessToken);
-        await expoSecureStore.setItemAsync(REFRESH_KEY, res.refreshToken);
-        set({ accessToken: res.accessToken, refreshToken: res.refreshToken });
+
+        await SecureStore.setItemAsync(TOKEN_KEY, res.accessToken);
+        await SecureStore.setItemAsync(REFRESH_KEY, res.refreshToken);
+        set({
+            accessToken: res.accessToken,
+            refreshToken: res.refreshToken,
+        });
+
         return res.accessToken;
     },
 
