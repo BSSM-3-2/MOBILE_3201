@@ -17,7 +17,7 @@ export default function UserProfileScreen() {
             fetchUser(id);
             fetchUserPosts(id);
         }
-    }, [id]);
+    }, [id, fetchUser, fetchUserPosts]);
 
     const user = profileMap[id];
     const posts = postMap[id] ?? [];

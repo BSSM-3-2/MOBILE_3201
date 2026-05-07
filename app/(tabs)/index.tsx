@@ -1,5 +1,12 @@
 import { useEffect } from 'react';
-import { ActivityIndicator, TouchableOpacity } from 'react-native';
+import {
+    ActivityIndicator,
+    TouchableOpacity,
+    View,
+    Text,
+    Pressable,
+    StyleSheet,
+} from 'react-native';
 import NavigationTop from '@components/navigation/NavigationTop';
 import ContentContainer from '@components/container';
 import { FeedList } from '@components/feed/FeedList';
@@ -14,8 +21,49 @@ import Animated, {
     Extrapolation,
 } from 'react-native-reanimated';
 
+function FeedError({
+    message,
+    onRetry,
+}: {
+    message: string;
+    onRetry: () => void;
+}) {
+    return (
+        <View style={feedErrorStyles.container}>
+            <Text style={feedErrorStyles.message}>{message}</Text>
+            <Pressable style={feedErrorStyles.button} onPress={onRetry}>
+                <Text style={feedErrorStyles.buttonText}>다시 시도</Text>
+            </Pressable>
+        </View>
+    );
+}
+
+const feedErrorStyles = StyleSheet.create({
+    container: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 12,
+    },
+    message: {
+        fontSize: 14,
+        color: '#8e8e8e',
+    },
+    button: {
+        paddingVertical: 8,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        backgroundColor: '#262626',
+    },
+    buttonText: {
+        color: '#fff',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+});
+
 export default function HomeScreen() {
-    const { posts, loading, fetchFeed, loadMore } = useFeedStore();
+    const { posts, loading, error, fetchFeed, loadMore } = useFeedStore();
     const router = useRouter();
 
     // scrollY: 스크롤 위치를 UI 스레드에서 직접 추적하는 SharedValue
@@ -44,7 +92,7 @@ export default function HomeScreen() {
 
     useEffect(() => {
         fetchFeed();
-    }, []);
+    }, [fetchFeed]);
 
     return (
         <ThemedView style={{ flex: 1, overflow: 'hidden' }}>
@@ -70,10 +118,11 @@ export default function HomeScreen() {
                 </ContentContainer>
             </Animated.View>
 
-            {loading && posts.length === 0 ? (
+            {error && posts.length === 0 ? (
+                <FeedError message={error} onRetry={fetchFeed} />
+            ) : loading && posts.length === 0 ? (
                 <ActivityIndicator style={{ flex: 1 }} />
             ) : (
-                // scrollY를 FeedList에 전달 → useAnimatedScrollHandler가 내부에서 처리
                 <FeedList
                     posts={posts}
                     onEndReached={loadMore}

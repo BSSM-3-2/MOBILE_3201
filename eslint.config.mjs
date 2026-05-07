@@ -20,8 +20,6 @@ export default defineConfig([
         },
         rules: {
             'no-unused-vars': 'off',
-            '@typescript-eslint/no-unused-vars': 'off',
-
             'unused-imports/no-unused-imports': 'error',
             'unused-imports/no-unused-vars': [
                 'warn',
@@ -34,12 +32,17 @@ export default defineConfig([
                     caughtErrorsIgnorePattern: '^_',
                 },
             ],
-
+            'prettier/prettier': 'error',
+        },
+        ignores: ['dist/*', 'commitlint.config.js', 'eslint.config.mjs'],
+    },
+    {
+        files: ['**/*.{ts,tsx,mts,cts}'],
+        rules: {
+            '@typescript-eslint/no-unused-vars': 'off',
             '@typescript-eslint/no-explicit-any': 'off',
-
             '@typescript-eslint/no-unsafe-function-type': 'off',
             '@typescript-eslint/no-empty-object-type': 'off',
-
             '@typescript-eslint/naming-convention': [
                 'error',
                 {
@@ -55,10 +58,7 @@ export default defineConfig([
                     format: ['PascalCase'],
                 },
             ],
-
-            'prettier/prettier': 'error',
         },
-        ignores: ['dist/*', 'commitlint.config.js', 'eslint.config.mjs'],
     },
     eslintPluginPrettierRecommended,
 ]);

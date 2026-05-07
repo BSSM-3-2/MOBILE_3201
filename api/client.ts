@@ -26,21 +26,34 @@ apiClient.interceptors.request.use(
     error => Promise.reject(error),
 );
 
+// Response Interceptor
+// 모든 응답 후에 실행 — 401이면 토큰 갱신 후 원본 요청 재시도
 let isRefreshing = false;
-let pendingQueue: {
+type QueueItem = {
     resolve: (token: string) => void;
     reject: (err: unknown) => void;
-}[] = [];
+};
+let pendingQueue: QueueItem[] = [];
 
-// Response Interceptor
-// 모든 응답 후에 실행 — 에러 코드를 한 곳에서 처리
+function processQueue(error: unknown, token: string | null) {
+    pendingQueue.forEach(({ resolve, reject }) => {
+        if (error) reject(error);
+        else resolve(token!);
+    });
+    pendingQueue = [];
+}
+
 apiClient.interceptors.response.use(
     response => response,
     async error => {
         const status = error.response?.status;
+        const originalConfig = error.config;
 
         if (status === 404) {
-            console.warn('[API] 리소스를 찾을 수 없습니다:', error.config?.url);
+            console.warn(
+                '[API] 리소스를 찾을 수 없습니다:',
+                originalConfig?.url,
+            );
             return Promise.reject(error);
         }
 
@@ -48,35 +61,29 @@ apiClient.interceptors.response.use(
             // eslint-disable-next-line @typescript-eslint/no-require-imports
             const { useAuthStore } = require('@/store/auth-store');
             const store = useAuthStore.getState();
-            const originalConfig = error.config;
 
-            // TODO 실습 4-3: store.logOut()을 호출하세요
-
-            // TODO 실습 5-2: logOut 대신 토큰 갱신을 시도하고 원본 요청을 재시도하세요
-            //   - isRefreshing 플래그로 중복 갱신 방지
-            //   - 갱신 중 들어온 요청은 pendingQueue에 쌓아두었다가 완료 후 일괄 처리
-            //   - 갱신 실패 시 store.logOut() 호출
+            // 이미 갱신 중이면 완료될 때까지 대기열에 추가
             if (isRefreshing) {
                 return new Promise<string>((resolve, reject) => {
                     pendingQueue.push({ resolve, reject });
-                }).then(token => {
-                    originalConfig.headers.Authorization = `Bearer ${token}`;
+                }).then(newToken => {
+                    originalConfig.headers.Authorization = `Bearer ${newToken}`;
                     return apiClient(originalConfig);
                 });
             }
 
             isRefreshing = true;
+
             try {
                 const newToken = await store.refreshAccessToken();
-                pendingQueue.forEach(({ resolve }) => resolve(newToken));
-                pendingQueue = [];
+                processQueue(null, newToken);
                 originalConfig.headers.Authorization = `Bearer ${newToken}`;
                 return apiClient(originalConfig);
-            } catch {
-                pendingQueue.forEach(({ reject }) => reject(error));
-                pendingQueue = [];
+            } catch (refreshError) {
+                processQueue(refreshError, null);
+                console.warn('[API] 토큰 갱신 실패. 로그아웃 처리');
                 await store.logOut();
-                return Promise.reject(error);
+                return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;
             }
