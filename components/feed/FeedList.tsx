@@ -1,4 +1,4 @@
-import { FlatList, RefreshControl } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet } from 'react-native';
 import Animated, {
     useAnimatedScrollHandler,
     SharedValue,
@@ -33,6 +33,9 @@ function FeedList({
             data={posts}
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
+                // TODO 4. 각 포스트를 독립 ErrorBoundary로 감싸세요.
+                //         - key={item.id} : 포스트마다 독립 인스턴스를 생성해 에러를 격리합니다.
+                //         - fallback: "이 게시물을 표시할 수 없어요." 텍스트를 postStyles.error 뷰로 표시하세요.
                 <SwipeableFeedPost post={item} onDelete={removePost} />
             )}
             showsVerticalScrollIndicator={false}
@@ -50,5 +53,18 @@ function FeedList({
         />
     );
 }
+
+const postStyles = StyleSheet.create({
+    error: {
+        paddingVertical: 24,
+        alignItems: 'center',
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: '#efefef',
+    },
+    errorText: {
+        fontSize: 13,
+        color: '#c7c7c7',
+    },
+});
 
 export { FeedList };

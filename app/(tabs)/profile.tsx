@@ -17,11 +17,11 @@ export default function ProfileScreen() {
 
     useEffect(() => {
         fetchMe();
-    }, []);
+    }, [fetchMe]);
 
     useEffect(() => {
         if (me) fetchUserPosts(me.id);
-    }, [me?.id]);
+    }, [me, fetchUserPosts]);
 
     const handleLogOut = useCallback(() => {
         Alert.alert('로그아웃', '정말 로그아웃할까요?', [
