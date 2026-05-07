@@ -17,6 +17,29 @@ import { StyleSheet } from 'react-native';
 import { useAuthStore } from '@/store/auth-store';
 import { usePushRegistration } from '@/hooks/use-push-registration';
 import * as Notifications from 'expo-notifications';
+import * as Sentry from '@sentry/react-native';
+
+Sentry.init({
+    dsn: 'https://3805f2c8e545273c3361afd6362543e7@o4511345979031552.ingest.us.sentry.io/4511345988075520',
+
+    // Adds more context data to events (IP address, cookies, user, etc.)
+    // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
+    sendDefaultPii: true,
+
+    // Enable Logs
+    enableLogs: true,
+
+    // Configure Session Replay
+    replaysSessionSampleRate: 0.1,
+    replaysOnErrorSampleRate: 1,
+    integrations: [
+        Sentry.mobileReplayIntegration(),
+        Sentry.feedbackIntegration(),
+    ],
+
+    // uncomment the line below to enable Spotlight (https://spotlightjs.com)
+    // spotlight: __DEV__,
+});
 
 // 포그라운드에서도 알림 배너가 보이도록 설정
 Notifications.setNotificationHandler({
@@ -62,7 +85,7 @@ function AuthGuard() {
     return null;
 }
 
-export default function RootLayout() {
+export default Sentry.wrap(function RootLayout() {
     const { bootstrap /* TODO 실습 3: bootstrap을 꺼내세요 */ } =
         useAuthStore();
     const colorScheme = useColorScheme();
@@ -144,7 +167,7 @@ export default function RootLayout() {
             </ThemeProvider>
         </GestureHandlerRootView>
     );
-}
+});
 
 const styles = StyleSheet.create({
     default: {
