@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
+    StyleSheet,
+    TextInput,
     TouchableOpacity,
     View,
     Text,
     Pressable,
-    StyleSheet,
 } from 'react-native';
 import NavigationTop from '@components/navigation/NavigationTop';
 import ContentContainer from '@components/container';
@@ -13,6 +14,7 @@ import { FeedList } from '@components/feed/FeedList';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedView } from '@components/themed-view';
 import { useFeedStore } from '@/store/feed-store';
+import { useFeedPosts } from '@/hooks/useFeedPosts';
 import { useRouter } from 'expo-router';
 import Animated, {
     useSharedValue,
@@ -37,6 +39,18 @@ function FeedError({
         </View>
     );
 }
+
+const searchStyles = StyleSheet.create({
+    input: {
+        marginHorizontal: 16,
+        marginVertical: 8,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        backgroundColor: '#f2f2f2',
+        fontSize: 14,
+    },
+});
 
 const feedErrorStyles = StyleSheet.create({
     container: {
@@ -63,8 +77,10 @@ const feedErrorStyles = StyleSheet.create({
 });
 
 export default function HomeScreen() {
-    const { posts, loading, error, fetchFeed, loadMore } = useFeedStore();
+    const { loading, error, fetchFeed, loadMore } = useFeedStore();
     const router = useRouter();
+    const [keyword, setKeyword] = useState('');
+    const { filteredPosts } = useFeedPosts(keyword);
 
     // scrollY: 스크롤 위치를 UI 스레드에서 직접 추적하는 SharedValue
     const scrollY = useSharedValue(0);
@@ -118,13 +134,20 @@ export default function HomeScreen() {
                 </ContentContainer>
             </Animated.View>
 
-            {error && posts.length === 0 ? (
+            <TextInput
+                value={keyword}
+                onChangeText={setKeyword}
+                placeholder='검색'
+                style={searchStyles.input}
+            />
+
+            {error && filteredPosts.length === 0 ? (
                 <FeedError message={error} onRetry={fetchFeed} />
-            ) : loading && posts.length === 0 ? (
+            ) : loading && filteredPosts.length === 0 ? (
                 <ActivityIndicator style={{ flex: 1 }} />
             ) : (
                 <FeedList
-                    posts={posts}
+                    posts={filteredPosts}
                     onEndReached={loadMore}
                     scrollY={scrollY}
                 />
