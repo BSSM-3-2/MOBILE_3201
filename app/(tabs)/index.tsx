@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     StyleSheet,
@@ -14,6 +14,7 @@ import { FeedList } from '@components/feed/FeedList';
 import { Ionicons } from '@expo/vector-icons';
 import { ThemedView } from '@components/themed-view';
 import { useFeedStore } from '@/store/feed-store';
+import { useFeedPosts } from '@/hooks/useFeedPosts';
 import { useRouter } from 'expo-router';
 import Animated, {
     useSharedValue,
@@ -76,17 +77,10 @@ const feedErrorStyles = StyleSheet.create({
 });
 
 export default function HomeScreen() {
-    const { posts, loading, error, fetchFeed, loadMore } = useFeedStore();
+    const { loading, error, fetchFeed, loadMore } = useFeedStore();
     const router = useRouter();
     const [keyword, setKeyword] = useState('');
-
-    const filteredPosts = useMemo(
-        () =>
-            keyword.trim()
-                ? posts.filter(p => p.caption?.includes(keyword))
-                : posts,
-        [posts, keyword],
-    );
+    const { filteredPosts } = useFeedPosts(keyword);
 
     // scrollY: 스크롤 위치를 UI 스레드에서 직접 추적하는 SharedValue
     const scrollY = useSharedValue(0);
