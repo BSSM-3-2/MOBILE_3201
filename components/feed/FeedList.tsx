@@ -9,6 +9,8 @@ import { SwipeableFeedPost } from './post/SwipeableFeedPost';
 import { useFeedStore } from '@/store/feed-store';
 import { ErrorBoundary } from '@components/ErrorBoundary';
 
+const ITEM_HEIGHT = 420;
+
 // Animated.FlatList: Reanimated의 네이티브 이벤트 시스템과 연결된 FlatList
 // — onScroll 핸들러가 JS 브리지 없이 UI 스레드에서 직접 실행됨
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList<Post>);
@@ -53,6 +55,13 @@ function FeedList({
             data={posts}
             keyExtractor={item => item.id}
             renderItem={renderItem}
+            getItemLayout={(_, index) => ({
+                length: ITEM_HEIGHT,
+                offset: ITEM_HEIGHT * index,
+                index,
+            })}
+            initialNumToRender={5}
+            windowSize={5}
             showsVerticalScrollIndicator={false}
             onEndReached={onEndReached}
             onEndReachedThreshold={0.5}
