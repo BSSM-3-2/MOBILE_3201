@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import Animated, {
     useAnimatedScrollHandler,
@@ -29,24 +30,29 @@ function FeedList({
         if (scrollY) scrollY.value = event.contentOffset.y;
     });
 
+    const renderItem = useCallback(
+        ({ item }: { item: Post }) => (
+            <ErrorBoundary
+                key={item.id}
+                fallback={
+                    <View style={postStyles.error}>
+                        <Text style={postStyles.errorText}>
+                            이 게시물을 표시할 수 없어요.
+                        </Text>
+                    </View>
+                }
+            >
+                <SwipeableFeedPost post={item} onDelete={removePost} />
+            </ErrorBoundary>
+        ),
+        [removePost],
+    );
+
     return (
         <AnimatedFlatList
             data={posts}
             keyExtractor={item => item.id}
-            renderItem={({ item }) => (
-                <ErrorBoundary
-                    key={item.id}
-                    fallback={
-                        <View style={postStyles.error}>
-                            <Text style={postStyles.errorText}>
-                                이 게시물을 표시할 수 없어요.
-                            </Text>
-                        </View>
-                    }
-                >
-                    <SwipeableFeedPost post={item} onDelete={removePost} />
-                </ErrorBoundary>
-            )}
+            renderItem={renderItem}
             showsVerticalScrollIndicator={false}
             onEndReached={onEndReached}
             onEndReachedThreshold={0.5}
